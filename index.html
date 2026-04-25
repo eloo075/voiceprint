@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voiceprint</title>
+  </head>
+  <body>
+    <div id="overlay">
+      <div id="title">VOICEPRINT</div>
+      <div id="tagline">It hears you.</div>
+      <div id="subtitle">Click to enter the station</div>
+      <div id="audio-warning">🎧 Best with headphones · Microphone required</div>
+      <div id="brand-credits">
+        <span>Built with</span>
+        <span class="brand">ZED</span>
+        <span>+</span>
+        <span class="brand">ELEVENLABS</span>
+      </div>
+    </div>
+    <div id="narrator-subtitle"></div>
+    <div id="hud">
+      <div id="sound-meter">
+        <div id="sound-fill"></div>
+      </div>
+      <div id="sound-label">SOUND</div>
+    </div>
+    <div id="crouch-indicator"></div>
+    <div id="crosshair"></div>
+    <div id="recording-prompt">
+      <div id="rec-circle"></div>
+      <div id="rec-text">SPEAK INTO YOUR MIC</div>
+      <div id="rec-sub">Read the line on screen</div>
+      <div id="rec-line"></div>
+      <div id="rec-timer">15</div>
+    </div>
+    <div id="cloning-status">CLONING YOUR VOICE...</div>
+    <div id="gameover">
+      <div id="gameover-title">IT FOUND YOU</div>
+      <div id="gameover-sub">Click to try again</div>
+    </div>
+    <div id="victory">
+      <div id="victory-title">YOU SURVIVED</div>
+      <div id="victory-credits">
+        <div class="cred-line">A game by Luka</div>
+        <div class="cred-line">Built with Zed and ElevenLabs</div>
+        <div class="cred-line">#ElevenHacks</div>
+      </div>
+      <div id="victory-sub">Click to play again</div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
