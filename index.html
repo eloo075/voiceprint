@@ -25,8 +25,32 @@
       </div>
       <div id="sound-label">SOUND</div>
     </div>
+    <div id="objective-hud">
+      <div id="objective-title">OBJECTIVE</div>
+      <div id="objective-lines">
+        <div id="objective-mic" class="objective-line active">
+          <span class="objective-dot"></span>
+          <span>Find the microphone</span>
+        </div>
+        <div id="objective-cores" class="objective-line">
+          <span class="objective-dot"></span>
+          <span>Collect 3 signal cores</span>
+        </div>
+        <div id="objective-terminal" class="objective-line">
+          <span class="objective-dot"></span>
+          <span>Shut down the broadcast</span>
+        </div>
+      </div>
+    </div>
+    <div id="competitive-stats">
+      <div id="core-counter">SIGNAL CORES: 0/3</div>
+      <div id="run-timer">00:00</div>
+      <div id="rank-preview">RANK: --</div>
+    </div>
     <div id="crouch-indicator"></div>
+    <div id="danger-vignette"></div>
     <div id="crosshair"></div>
+    <div id="interaction-prompt"></div>
     <div id="recording-prompt">
       <div id="rec-circle"></div>
       <div id="rec-text">SPEAK INTO YOUR MIC</div>
@@ -41,6 +65,10 @@
     </div>
     <div id="victory">
       <div id="victory-title">YOU SURVIVED</div>
+      <div id="victory-stats">
+        <div id="victory-time">TIME: 00:00</div>
+        <div id="victory-rank">RANK: SIGNAL SURVIVOR</div>
+      </div>
       <div id="victory-credits">
         <div class="cred-line">A game by Luka</div>
         <div class="cred-line">Built with Zed and ElevenLabs</div>

@@ -552,6 +552,21 @@ function init() {
     brokenLight.position.set(8, 2.7, 8);
     scene.add(brokenLight);
 
+    // Warm amber desk lamp glow at the mixing desk
+    const deskLamp = new THREE.PointLight(0xff8820, 1.2, 5);
+    deskLamp.position.set(-10, 1.8, -10);
+    scene.add(deskLamp);
+
+    // Cold barely-working fluorescent strip — east corridor
+    const coldStrip = new THREE.PointLight(0x8899ff, 0.22, 9);
+    coldStrip.position.set(6, 2.8, -3);
+    scene.add(coldStrip);
+
+    // Faint amber near south wall — unknown source
+    const southAmber = new THREE.PointLight(0xffaa40, 0.14, 6);
+    southAmber.position.set(-4, 2.5, 12);
+    scene.add(southAmber);
+
     // ============ MATERIALS ============
     const wallMat = new THREE.MeshStandardMaterial({
         map: wallTex,
@@ -608,6 +623,31 @@ function init() {
     addWall(5, 5, 10, 0.3);
     addWall(-8, 3, 0.3, 6);
     addWall(8, -3, 0.3, 6);
+
+    // ============ CEILING LIGHT FIXTURES ============
+    const ceilingLights: THREE.PointLight[] = [];
+    function addCeilingFixture(x: number, z: number): THREE.PointLight {
+        const housing = new THREE.Mesh(
+            new THREE.BoxGeometry(1.4, 0.07, 0.22),
+            new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.8 }),
+        );
+        housing.position.set(x, ROOM_H - 0.035, z);
+        scene.add(housing);
+        const tube = new THREE.Mesh(
+            new THREE.BoxGeometry(1.1, 0.02, 0.15),
+            new THREE.MeshBasicMaterial({ color: 0xc8d8ff }),
+        );
+        tube.position.set(x, ROOM_H - 0.07, z);
+        scene.add(tube);
+        const pl = new THREE.PointLight(0xc8d8ff, 0.5, 8);
+        pl.position.set(x, ROOM_H - 0.12, z);
+        scene.add(pl);
+        return pl;
+    }
+    ceilingLights.push(addCeilingFixture(-5, -8)); // near desk area
+    ceilingLights.push(addCeilingFixture(3, 2)); // center-right
+    ceilingLights.push(addCeilingFixture(-2, 7)); // south half
+    ceilingLights.push(addCeilingFixture(8, -5)); // east side
 
     // ============ POSTERS ============
     function addPoster(
@@ -691,6 +731,104 @@ function init() {
         0.85,
         1.3,
     );
+
+    // ============ CLOCK + SURVEILLANCE CAMERAS ============
+    function makeClockTexture(): THREE.CanvasTexture {
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "#e8dfc0";
+        ctx.beginPath();
+        ctx.arc(128, 128, 115, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#2a1a0a";
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        for (let i = 0; i < 12; i++) {
+            const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+            const r1 = i % 3 === 0 ? 90 : 97;
+            ctx.strokeStyle = "#2a1a0a";
+            ctx.lineWidth = i % 3 === 0 ? 4 : 2;
+            ctx.beginPath();
+            ctx.moveTo(128 + Math.cos(a) * r1, 128 + Math.sin(a) * r1);
+            ctx.lineTo(128 + Math.cos(a) * 108, 128 + Math.sin(a) * 108);
+            ctx.stroke();
+        }
+        // Hands stopped at 11:11
+        const hourA =
+            (11 / 12) * Math.PI * 2 - Math.PI / 2 + (11 / 60) * (Math.PI / 6);
+        const minA = (55 / 60) * Math.PI * 2 - Math.PI / 2;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "#1a0a00";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(128, 128);
+        ctx.lineTo(128 + Math.cos(hourA) * 62, 128 + Math.sin(hourA) * 62);
+        ctx.stroke();
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(128, 128);
+        ctx.lineTo(128 + Math.cos(minA) * 85, 128 + Math.sin(minA) * 85);
+        ctx.stroke();
+        ctx.fillStyle = "#1a0a00";
+        ctx.beginPath();
+        ctx.arc(128, 128, 5, 0, Math.PI * 2);
+        ctx.fill();
+        // Crack lines
+        ctx.strokeStyle = "rgba(0,0,0,0.35)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(128, 128);
+        ctx.lineTo(195, 75);
+        ctx.moveTo(128, 128);
+        ctx.lineTo(210, 155);
+        ctx.moveTo(128, 128);
+        ctx.lineTo(85, 190);
+        ctx.stroke();
+        applyAging(ctx, 256, 256);
+        return new THREE.CanvasTexture(canvas);
+    }
+    // Clock on east wall — stopped at 11:11
+    addPoster(makeClockTexture(), 14.8, 2.1, -12, -Math.PI / 2, 0.48, 0.48);
+
+    // Surveillance cameras — geometry props on walls
+    function addSurvCam(x: number, y: number, z: number, ry: number) {
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(0.1, 0.08, 0.22),
+            new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                roughness: 0.5,
+            }),
+        );
+        body.position.set(x, y, z);
+        body.rotation.y = ry;
+        scene.add(body);
+        const lens = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.025, 0.03, 0.07, 8),
+            new THREE.MeshStandardMaterial({
+                color: 0x050505,
+                metalness: 0.9,
+                roughness: 0.1,
+            }),
+        );
+        lens.rotation.x = Math.PI / 2;
+        lens.position.set(
+            x + Math.sin(ry) * -0.12,
+            y,
+            z + Math.cos(ry) * -0.12,
+        );
+        scene.add(lens);
+        const led = new THREE.Mesh(
+            new THREE.SphereGeometry(0.007, 6, 6),
+            new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+        );
+        led.position.set(x + 0.03, y + 0.03, z);
+        scene.add(led);
+    }
+    addSurvCam(-14.5, 2.9, -13, Math.PI / 2); // NW corner
+    addSurvCam(14.5, 2.9, 5, -Math.PI / 2); // east wall
+    addSurvCam(0, 2.9, -14.5, 0); // north wall center
 
     // ============ GRAFFITI DECALS ============
     function addGraffiti(
@@ -1031,6 +1169,126 @@ function init() {
         scene.add(reel);
     }
 
+    // ============ STATIC TV ============
+    const tvCanvas = document.createElement("canvas");
+    tvCanvas.width = 128;
+    tvCanvas.height = 96;
+    const tvCtx = tvCanvas.getContext("2d")!;
+    const tvTex = new THREE.CanvasTexture(tvCanvas);
+
+    const tvBody = new THREE.Mesh(
+        new THREE.BoxGeometry(0.85, 0.65, 0.45),
+        new THREE.MeshStandardMaterial({ color: 0x0d0d0d, roughness: 0.8 }),
+    );
+    tvBody.position.set(12, 1.15, -13.5);
+    tvBody.rotation.y = -Math.PI / 5;
+    scene.add(tvBody);
+
+    const tvScreen = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.7, 0.52),
+        new THREE.MeshBasicMaterial({ map: tvTex }),
+    );
+    tvScreen.position.set(12, 1.15, -13.5);
+    tvScreen.rotation.y = -Math.PI / 5;
+    tvScreen.translateZ(0.23);
+    scene.add(tvScreen);
+
+    const tvGlow = new THREE.PointLight(0x888888, 0.3, 3);
+    tvGlow.position.set(12, 1.15, -13.5);
+    scene.add(tvGlow);
+
+    const tvStand = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.3, 0.12),
+        new THREE.MeshStandardMaterial({ color: 0x0d0d0d, roughness: 0.7 }),
+    );
+    tvStand.position.set(12, 0.65, -13.5);
+    scene.add(tvStand);
+
+    const tvBase = new THREE.Mesh(
+        new THREE.BoxGeometry(0.55, 0.05, 0.3),
+        new THREE.MeshStandardMaterial({ color: 0x0d0d0d, roughness: 0.7 }),
+    );
+    tvBase.position.set(12, 0.5, -13.5);
+    scene.add(tvBase);
+
+    // ============ FALLEN FILE CABINET ============
+    const cabinetMat = new THREE.MeshStandardMaterial({
+        color: 0x4a5555,
+        roughness: 0.7,
+    });
+    const cabinetBody = new THREE.Mesh(
+        new THREE.BoxGeometry(0.55, 1.4, 0.55),
+        cabinetMat,
+    );
+    cabinetBody.position.set(-13, 0.285, 6.5);
+    cabinetBody.rotation.z = Math.PI / 2;
+    scene.add(cabinetBody);
+
+    for (let i = 0; i < 3; i++) {
+        const drawer = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 0.27, 0.03),
+            new THREE.MeshStandardMaterial({ color: 0x3a4545, roughness: 0.6 }),
+        );
+        drawer.position.set(-13, 0.28 + (i - 1) * 0.3, 6.5 + 0.28 + i * 0.02);
+        scene.add(drawer);
+    }
+
+    const folderColors = [0x8a5520, 0x556030, 0x204060, 0x602020, 0x705030];
+    for (let i = 0; i < 5; i++) {
+        const folder = new THREE.Mesh(
+            new THREE.PlaneGeometry(
+                0.25 + Math.random() * 0.1,
+                0.32 + Math.random() * 0.08,
+            ),
+            new THREE.MeshStandardMaterial({
+                color: folderColors[i],
+                roughness: 0.9,
+                side: THREE.DoubleSide,
+            }),
+        );
+        folder.position.set(
+            -12.2 + (Math.random() - 0.5) * 1.5,
+            0.005,
+            6.5 + (Math.random() - 0.5) * 1.5,
+        );
+        folder.rotation.x = -Math.PI / 2;
+        folder.rotation.z = (Math.random() - 0.5) * 1.2;
+        scene.add(folder);
+    }
+
+    // ============ BLOOD POOLS ============
+    function addBloodPool(x: number, z: number, r: number) {
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0x1e0000,
+            roughness: 1,
+            transparent: true,
+            opacity: 0.9,
+        });
+        const pool = new THREE.Mesh(new THREE.CircleGeometry(r, 10), mat);
+        pool.rotation.x = -Math.PI / 2;
+        pool.position.set(x, 0.005, z);
+        scene.add(pool);
+        for (let i = 0; i < 4; i++) {
+            const drop = new THREE.Mesh(
+                new THREE.CircleGeometry(r * (0.1 + Math.random() * 0.2), 7),
+                mat,
+            );
+            drop.rotation.x = -Math.PI / 2;
+            drop.position.set(
+                x + (Math.random() - 0.5) * r * 2.5,
+                0.006,
+                z + (Math.random() - 0.5) * r * 2.5,
+            );
+            scene.add(drop);
+        }
+    }
+    addBloodPool(-13.3, -6.3, 0.38); // west wall handprint cluster
+    addBloodPool(-13.7, -4.8, 0.22);
+    addBloodPool(-5.5, 13.3, 0.32); // south wall
+    addBloodPool(-7.8, 13.6, 0.2); // slid-down print
+    addBloodPool(13.2, 0.3, 0.3); // east wall dramatic print
+    addBloodPool(7.8, -13.2, 0.25); // north wall
+
     // ============ MONSTER (THE LISTENER) ============
     const monster = new THREE.Group();
 
@@ -1095,6 +1353,404 @@ function init() {
     let monsterTarget = new THREE.Vector3(12, 0, 12);
     let monsterIdleTimer = 0;
     let gameOver = false;
+
+    // ============ EXTRA VISUAL PROPS + COMPETITIVE OBJECTIVES ============
+
+    // Animated static TV in the NE corner
+    const propTvCanvas = document.createElement("canvas");
+    propTvCanvas.width = 256;
+    propTvCanvas.height = 192;
+    const propTvCtx = propTvCanvas.getContext("2d")!;
+    const propTvTexture = new THREE.CanvasTexture(propTvCanvas);
+
+    const propTvBody = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 0.9, 0.9),
+        new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.7 }),
+    );
+    propTvBody.position.set(13, 1.4, -13);
+    propTvBody.rotation.y = -Math.PI / 4;
+    scene.add(propTvBody);
+
+    const propTvScreen = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.95, 0.7),
+        new THREE.MeshBasicMaterial({ map: propTvTexture }),
+    );
+    propTvScreen.position.set(13, 1.4, -13);
+    propTvScreen.rotation.y = -Math.PI / 4;
+    propTvScreen.position.x += Math.cos(-Math.PI / 4) * 0.46;
+    propTvScreen.position.z += Math.sin(-Math.PI / 4) * 0.46;
+    scene.add(propTvScreen);
+
+    const propTvLight = new THREE.PointLight(0x4080a0, 0.6, 5);
+    propTvLight.position.set(12, 1.4, -12);
+    scene.add(propTvLight);
+
+    const propTvStand = new THREE.Mesh(
+        new THREE.BoxGeometry(0.6, 0.6, 0.6),
+        new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.9 }),
+    );
+    propTvStand.position.set(13, 0.3, -13);
+    propTvStand.rotation.y = -Math.PI / 4;
+    scene.add(propTvStand);
+
+    // Ceiling light fixtures
+    function addDetailedCeilingFixture(
+        x: number,
+        z: number,
+        broken: boolean = false,
+    ): {
+        bulb: THREE.Mesh;
+        light: THREE.PointLight;
+        broken: boolean;
+    } {
+        const plate = new THREE.Mesh(
+            new THREE.BoxGeometry(0.6, 0.05, 0.3),
+            new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 }),
+        );
+        plate.position.set(x, 2.97, z);
+        scene.add(plate);
+
+        const chain = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6),
+            new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.8 }),
+        );
+        chain.position.set(x, 2.8, z);
+        scene.add(chain);
+
+        const shade = new THREE.Mesh(
+            new THREE.ConeGeometry(0.18, 0.2, 12, 1, true),
+            new THREE.MeshStandardMaterial({
+                color: 0x2a2a2a,
+                roughness: 0.5,
+                metalness: 0.3,
+                side: THREE.DoubleSide,
+            }),
+        );
+        shade.position.set(x, 2.6, z);
+        scene.add(shade);
+
+        const bulb = new THREE.Mesh(
+            new THREE.SphereGeometry(0.06, 12, 12),
+            new THREE.MeshBasicMaterial({
+                color: broken ? 0x000000 : 0xfff5d0,
+            }),
+        );
+        bulb.position.set(x, 2.55, z);
+        scene.add(bulb);
+
+        const light = new THREE.PointLight(0xfff5d0, broken ? 0 : 0.8, 5);
+        light.position.set(x, 2.5, z);
+        scene.add(light);
+
+        return { bulb, light, broken };
+    }
+
+    const detailedCeilingLights: {
+        bulb: THREE.Mesh;
+        light: THREE.PointLight;
+        broken: boolean;
+    }[] = [];
+    detailedCeilingLights.push(addDetailedCeilingFixture(-7, 0, false));
+    detailedCeilingLights.push(addDetailedCeilingFixture(0, -7, true));
+    detailedCeilingLights.push(addDetailedCeilingFixture(7, 7, false));
+    detailedCeilingLights.push(addDetailedCeilingFixture(-7, -10, true));
+    detailedCeilingLights.push(addDetailedCeilingFixture(5, -3, false));
+
+    // Blood pools and floor smears
+    function addBloodSmearPool(x: number, z: number, scale: number = 1) {
+        const pool = new THREE.Mesh(
+            new THREE.CircleGeometry(0.4 * scale, 24),
+            new THREE.MeshStandardMaterial({
+                color: 0x4a0808,
+                roughness: 0.4,
+                metalness: 0.1,
+            }),
+        );
+        pool.rotation.x = -Math.PI / 2;
+        pool.position.set(x, 0.012, z);
+        scene.add(pool);
+
+        const smear = new THREE.Mesh(
+            new THREE.CircleGeometry(0.7 * scale, 24),
+            new THREE.MeshStandardMaterial({
+                color: 0x2a0404,
+                roughness: 1,
+                transparent: true,
+                opacity: 0.8,
+            }),
+        );
+        smear.rotation.x = -Math.PI / 2;
+        smear.position.set(x, 0.011, z);
+        smear.scale.x = 1 + Math.random() * 0.5;
+        smear.scale.y = 1 + Math.random() * 0.3;
+        scene.add(smear);
+
+        const streak = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.2 * scale, 1.0 * scale),
+            new THREE.MeshStandardMaterial({
+                color: 0x2a0404,
+                transparent: true,
+                opacity: 0.7,
+                roughness: 1,
+            }),
+        );
+        streak.rotation.x = -Math.PI / 2;
+        streak.rotation.z = Math.random() * Math.PI * 2;
+        streak.position.set(
+            x + (Math.random() - 0.5) * 0.4,
+            0.011,
+            z + (Math.random() - 0.5) * 0.4,
+        );
+        scene.add(streak);
+    }
+
+    addBloodSmearPool(-6, 12, 1.2);
+    addBloodSmearPool(-2, 12, 0.7);
+    addBloodSmearPool(10, 4, 1.0);
+    addBloodSmearPool(-9, -6, 0.9);
+    addBloodSmearPool(4, -10, 1.1);
+
+    // Fallen file cabinet with spilled folders
+    const cabinetGroup = new THREE.Group();
+    cabinetGroup.position.set(11, 0, -7);
+    cabinetGroup.rotation.z = Math.PI / 2;
+
+    const cabinet = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 1.2, 0.4),
+        new THREE.MeshStandardMaterial({
+            color: 0x3a4a4a,
+            roughness: 0.7,
+            metalness: 0.4,
+        }),
+    );
+    cabinet.position.set(0, 0.25, 0);
+    cabinetGroup.add(cabinet);
+
+    for (let i = 0; i < 3; i++) {
+        const drawer = new THREE.Mesh(
+            new THREE.BoxGeometry(0.51, 0.02, 0.42),
+            new THREE.MeshStandardMaterial({ color: 0x1a2222, roughness: 0.5 }),
+        );
+        drawer.position.set(0, -0.3 + i * 0.3, 0);
+        cabinetGroup.add(drawer);
+
+        const handle = new THREE.Mesh(
+            new THREE.BoxGeometry(0.15, 0.04, 0.04),
+            new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8 }),
+        );
+        handle.position.set(0, -0.3 + i * 0.3, 0.22);
+        cabinetGroup.add(handle);
+    }
+    scene.add(cabinetGroup);
+
+    for (let i = 0; i < 18; i++) {
+        const isFolder = Math.random() < 0.4;
+        const paper = new THREE.Mesh(
+            new THREE.PlaneGeometry(
+                isFolder ? 0.22 : 0.18,
+                isFolder ? 0.3 : 0.24,
+            ),
+            new THREE.MeshStandardMaterial({
+                color: isFolder ? 0xb89858 : 0xddd2b8,
+                roughness: 0.95,
+                side: THREE.DoubleSide,
+            }),
+        );
+        paper.position.set(
+            11 + (Math.random() - 0.5) * 2.5,
+            0.011,
+            -7 + (Math.random() - 0.5) * 2.5,
+        );
+        paper.rotation.x = -Math.PI / 2;
+        paper.rotation.z = Math.random() * Math.PI * 2;
+        scene.add(paper);
+    }
+
+    // Stopped clock at 11:11 on the north wall
+    const clockGroup = new THREE.Group();
+    clockGroup.position.set(0, 2.3, -14.78);
+
+    const clockFace = new THREE.Mesh(
+        new THREE.CircleGeometry(0.35, 32),
+        new THREE.MeshStandardMaterial({ color: 0xe8dfc4, roughness: 0.6 }),
+    );
+    clockGroup.add(clockFace);
+
+    const clockRim = new THREE.Mesh(
+        new THREE.RingGeometry(0.35, 0.4, 32),
+        new THREE.MeshStandardMaterial({
+            color: 0x2a2a2a,
+            roughness: 0.7,
+            side: THREE.DoubleSide,
+        }),
+    );
+    clockRim.position.z = 0.001;
+    clockGroup.add(clockRim);
+
+    const clockNumCanvas = document.createElement("canvas");
+    clockNumCanvas.width = 256;
+    clockNumCanvas.height = 256;
+    const cnCtx = clockNumCanvas.getContext("2d")!;
+    cnCtx.clearRect(0, 0, 256, 256);
+    cnCtx.fillStyle = "#000";
+    cnCtx.font = "bold 28px Georgia";
+    cnCtx.textAlign = "center";
+    cnCtx.textBaseline = "middle";
+    cnCtx.fillText("12", 128, 30);
+    cnCtx.fillText("3", 226, 128);
+    cnCtx.fillText("6", 128, 226);
+    cnCtx.fillText("9", 30, 128);
+    const clockNumTex = new THREE.CanvasTexture(clockNumCanvas);
+    const clockNumbers = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.7, 0.7),
+        new THREE.MeshBasicMaterial({ map: clockNumTex, transparent: true }),
+    );
+    clockNumbers.position.z = 0.005;
+    clockGroup.add(clockNumbers);
+
+    const hourHand = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.025, 0.18),
+        new THREE.MeshBasicMaterial({ color: 0x000000 }),
+    );
+    hourHand.position.z = 0.008;
+    hourHand.rotation.z = (30 * Math.PI) / 180;
+    hourHand.position.x = -Math.sin((30 * Math.PI) / 180) * 0.06;
+    hourHand.position.y = Math.cos((30 * Math.PI) / 180) * 0.06;
+    clockGroup.add(hourHand);
+
+    const minHand = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.02, 0.25),
+        new THREE.MeshBasicMaterial({ color: 0x000000 }),
+    );
+    minHand.position.z = 0.009;
+    const minAngle = (66 * Math.PI) / 180;
+    minHand.rotation.z = -minAngle;
+    minHand.position.x = Math.sin(minAngle) * 0.1;
+    minHand.position.y = Math.cos(minAngle) * 0.1;
+    clockGroup.add(minHand);
+
+    const clockCenter = new THREE.Mesh(
+        new THREE.CircleGeometry(0.02, 16),
+        new THREE.MeshBasicMaterial({ color: 0xaa0000 }),
+    );
+    clockCenter.position.z = 0.01;
+    clockGroup.add(clockCenter);
+
+    scene.add(clockGroup);
+
+    // Surveillance cameras with blinking LEDs
+    function addSurveillanceCamera(
+        x: number,
+        y: number,
+        z: number,
+        ry: number,
+    ) {
+        const camGroup = new THREE.Group();
+
+        const bracket = new THREE.Mesh(
+            new THREE.BoxGeometry(0.08, 0.08, 0.15),
+            new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.6 }),
+        );
+        bracket.position.z = 0.075;
+        camGroup.add(bracket);
+
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2, 0.15, 0.25),
+            new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.5 }),
+        );
+        body.position.z = 0.27;
+        camGroup.add(body);
+
+        const lens = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.05, 0.05, 0.05, 12),
+            new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                metalness: 0.9,
+                roughness: 0.1,
+            }),
+        );
+        lens.rotation.x = Math.PI / 2;
+        lens.position.set(0, 0, 0.4);
+        camGroup.add(lens);
+
+        const led = new THREE.Mesh(
+            new THREE.SphereGeometry(0.012, 8, 8),
+            new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+        );
+        led.position.set(0.06, 0.05, 0.32);
+        camGroup.add(led);
+
+        camGroup.position.set(x, y, z);
+        camGroup.rotation.y = ry;
+        scene.add(camGroup);
+        return led;
+    }
+
+    const surveillanceLeds = [
+        addSurveillanceCamera(-14.5, 2.5, -14.5, Math.PI / 4),
+        addSurveillanceCamera(14.5, 2.5, -14.5, -Math.PI / 4),
+        addSurveillanceCamera(-14.5, 2.5, 14.5, (3 * Math.PI) / 4),
+        addSurveillanceCamera(14.5, 2.5, 14.5, (-3 * Math.PI) / 4),
+    ];
+
+    // Competitive signal cores: collect all three before shutting down broadcast
+    type SignalCore = {
+        group: THREE.Group;
+        orb: THREE.Mesh;
+        light: THREE.PointLight;
+        collected: boolean;
+        baseY: number;
+    };
+
+    const signalCores: SignalCore[] = [];
+
+    function addSignalCore(x: number, z: number) {
+        const group = new THREE.Group();
+        group.position.set(x, 0, z);
+
+        const pedestal = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.22, 0.28, 0.35, 16),
+            new THREE.MeshStandardMaterial({
+                color: 0x141010,
+                roughness: 0.55,
+                metalness: 0.45,
+            }),
+        );
+        pedestal.position.y = 0.18;
+        group.add(pedestal);
+
+        const orb = new THREE.Mesh(
+            new THREE.IcosahedronGeometry(0.18, 1),
+            new THREE.MeshBasicMaterial({ color: 0xff2020 }),
+        );
+        orb.position.y = 0.62;
+        group.add(orb);
+
+        const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(0.28, 0.012, 8, 32),
+            new THREE.MeshBasicMaterial({ color: 0xaa0000 }),
+        );
+        ring.position.y = 0.62;
+        ring.rotation.x = Math.PI / 2;
+        group.add(ring);
+
+        const light = new THREE.PointLight(0xff2020, 1.4, 4);
+        light.position.set(0, 0.75, 0);
+        group.add(light);
+
+        scene.add(group);
+        signalCores.push({
+            group,
+            orb,
+            light,
+            collected: false,
+            baseY: group.position.y,
+        });
+    }
+
+    addSignalCore(-12, 10);
+    addSignalCore(12, -11);
+    addSignalCore(2, -3);
 
     // ============ DUST ============
     const particleCount = 200;
@@ -1221,47 +1877,104 @@ function init() {
     }
 
     function triggerGameOver() {
-        if (gameOver) return;
+        if (gameOver || escaped) return;
         gameOver = true;
-        playOneShot("monster_caught_scream", 1.0);
-        setHeartbeatRate(0);
-        if (gameoverEl) {
-            setTimeout(() => gameoverEl.classList.add("visible"), 300);
+
+        for (const key of Object.keys(keys)) {
+            keys[key] = false;
         }
-        document.exitPointerLock();
+
+        hideInteractionPrompt();
+        setHeartbeatRate(0);
+        updateMonsterBreath(1, 0);
+        dangerVignetteEl?.classList.remove("warn", "danger");
+        document
+            .getElementById("recording-prompt")
+            ?.classList.remove("visible");
+        document.getElementById("cloning-status")?.classList.remove("visible");
+        document
+            .getElementById("crouch-indicator")
+            ?.classList.remove("visible");
+
+        playOneShot("monster_caught_scream", 1.0);
+        if (gameoverEl) {
+            setTimeout(() => {
+                if (escaped) return;
+                gameoverEl.classList.add("visible");
+            }, 300);
+        }
+        if (document.pointerLockElement) document.exitPointerLock();
     }
 
     function triggerVictory() {
+        if (escaped || gameOver) return;
+        escaped = true;
+
+        for (const key of Object.keys(keys)) {
+            keys[key] = false;
+        }
+
+        hideInteractionPrompt();
+        dangerVignetteEl?.classList.remove("warn", "danger");
+        document
+            .getElementById("recording-prompt")
+            ?.classList.remove("visible");
+        document.getElementById("cloning-status")?.classList.remove("visible");
+        document
+            .getElementById("crouch-indicator")
+            ?.classList.remove("visible");
+
+        const finalElapsed = performance.now() - runStartTime;
+        const finalRank = getRunRank(finalElapsed);
+        const victoryTimeEl = document.getElementById("victory-time");
+        const victoryRankEl = document.getElementById("victory-rank");
+        if (victoryTimeEl)
+            victoryTimeEl.textContent = `TIME: ${formatRunTime(finalElapsed)}`;
+        if (victoryRankEl) {
+            victoryRankEl.textContent = `RANK: ${finalRank.label}`;
+            victoryRankEl.classList.remove("rank-s", "rank-a");
+            if (finalRank.className)
+                victoryRankEl.classList.add(finalRank.className);
+        }
+
+        setObjectiveState(objectiveTerminalEl, "complete");
+
         // Stop monster
         monster.visible = false;
+        monsterAwareness = 0;
         setHeartbeatRate(0);
         updateMonsterBreath(1, 0); // mute breathing
+
         // Black out terminal
         screen.material = new THREE.MeshBasicMaterial({ color: 0x000000 });
         labelMesh.visible = false;
         terminalLight.intensity = 0;
+
         // Static burst then narrator
         playOneShot("static_burst", 0.5);
         setTimeout(() => {
+            if (gameOver) return;
             showSubtitle(
                 "The signal is dead. The broadcasts are over. You can leave now.",
                 8000,
             );
             // Show victory screen after the line
             setTimeout(() => {
+                if (gameOver) return;
                 const victoryEl = document.getElementById("victory");
                 if (victoryEl) victoryEl.classList.add("visible");
-                document.exitPointerLock();
+                if (document.pointerLockElement) document.exitPointerLock();
             }, 7000);
         }, 800);
     }
 
     async function startVoiceCloningSequence() {
-        if (voiceCloneStarted) return;
+        if (voiceCloneStarted || escaped || gameOver) return;
         voiceCloneStarted = true;
 
         // Step 1: Narrator asks player to speak
         await playNarrator("narrator_record_request", 1.0);
+        if (escaped || gameOver) return;
         showSubtitle("Wait. Something wants to hear you. Speak.", 5000);
 
         // Step 2: Show recording prompt with a line to read
@@ -1290,6 +2003,10 @@ function init() {
             clearInterval(timerInterval);
             if (recPrompt) recPrompt.classList.remove("visible");
 
+            if (escaped || gameOver) {
+                return;
+            }
+
             // Step 4: Show cloning status
             const cloneStatus = document.getElementById("cloning-status");
             if (cloneStatus) cloneStatus.classList.add("visible");
@@ -1298,6 +2015,11 @@ function init() {
             console.log("Cloning voice...");
             clonedVoiceId = await cloneVoice(audioBlob);
             console.log("Voice cloned! ID:", clonedVoiceId);
+
+            if (escaped || gameOver) {
+                if (cloneStatus) cloneStatus.classList.remove("visible");
+                return;
+            }
 
             // Step 6: Pre-generate whisper TTS buffers
             console.log("Generating whisper lines...");
@@ -1315,8 +2037,13 @@ function init() {
 
             if (cloneStatus) cloneStatus.classList.remove("visible");
 
+            if (escaped || gameOver) {
+                return;
+            }
+
             // Step 7: Narrator delivers the punchline
             await playNarrator("narrator_clone_done", 1.0);
+            if (escaped || gameOver) return;
             showSubtitle("It has your voice now.", 5000);
 
             // Activate the cloned-whisper threat
@@ -1378,11 +2105,144 @@ function init() {
     let clonedWhisperBuffers: AudioBuffer[] = [];
     let cloneWhisperTimer = 999;
     let escaped = false;
+    let monsterStepAccum = 0;
+    let tvStaticTimer = 0;
+
+    // Competitive run state
+    let coresCollected = 0;
+    let terminalLockedCooldown = 0;
+    let coreFlashActive = false;
+    const runStartTime = performance.now();
+
+    const dangerVignetteEl = document.getElementById("danger-vignette");
+    const objectiveMicEl = document.getElementById("objective-mic");
+    const objectiveCoresEl = document.getElementById("objective-cores");
+    const objectiveTerminalEl = document.getElementById("objective-terminal");
+    const coreCounterEl = document.getElementById("core-counter");
+    const runTimerEl = document.getElementById("run-timer");
+    const rankPreviewEl = document.getElementById("rank-preview");
+    const interactionPromptEl = document.getElementById("interaction-prompt");
+
+    function formatRunTime(ms: number): string {
+        const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+
+    function getRunRank(elapsedMs: number): {
+        label: string;
+        className: string;
+    } {
+        if (elapsedMs <= 120000) {
+            return { label: "S+ SIGNAL BREAKER", className: "rank-s" };
+        }
+        if (elapsedMs <= 180000) {
+            return { label: "A VOICEPRINT SURVIVOR", className: "rank-a" };
+        }
+        return { label: "B BROADCAST ESCAPEE", className: "" };
+    }
+
+    function setObjectiveState(
+        el: HTMLElement | null,
+        state: "active" | "complete" | "idle",
+    ) {
+        if (!el) return;
+        el.classList.remove("active", "complete");
+        if (state !== "idle") el.classList.add(state);
+    }
+
+    function updateCompetitiveHud(elapsed = performance.now() - runStartTime) {
+        if (runTimerEl) runTimerEl.textContent = formatRunTime(elapsed);
+        if (coreCounterEl) {
+            coreCounterEl.textContent = `SIGNAL CORES: ${coresCollected}/${signalCores.length}`;
+        }
+        if (rankPreviewEl) {
+            rankPreviewEl.textContent = `RANK: ${getRunRank(elapsed).label}`;
+        }
+
+        setObjectiveState(objectiveMicEl, micFound ? "complete" : "active");
+        setObjectiveState(
+            objectiveCoresEl,
+            !micFound
+                ? "idle"
+                : coresCollected >= signalCores.length
+                  ? "complete"
+                  : "active",
+        );
+        setObjectiveState(
+            objectiveTerminalEl,
+            coresCollected >= signalCores.length ? "active" : "idle",
+        );
+    }
+
+    function showInteractionPrompt(
+        text: string,
+        state: "locked" | "ready" = "ready",
+    ) {
+        if (!interactionPromptEl) return;
+        interactionPromptEl.textContent = text;
+        interactionPromptEl.classList.remove("locked", "ready");
+        interactionPromptEl.classList.add("visible", state);
+    }
+
+    function hideInteractionPrompt() {
+        if (!interactionPromptEl) return;
+        interactionPromptEl.classList.remove("visible", "locked", "ready");
+    }
+
+    function flashCoreCollected() {
+        if (coreFlashActive) return;
+        coreFlashActive = true;
+        const flash = document.createElement("div");
+        flash.className = "core-collected-flash";
+        document.body.appendChild(flash);
+        setTimeout(() => {
+            flash.remove();
+            coreFlashActive = false;
+        }, 700);
+    }
+
+    function collectSignalCore(core: SignalCore) {
+        if (core.collected) return;
+        core.collected = true;
+        coresCollected++;
+        core.group.visible = false;
+        core.light.intensity = 0;
+        playOneShot("static_burst", 0.18, 1.4);
+        flashCoreCollected();
+
+        // Competitive pressure: each recovered core briefly alerts the monster.
+        soundLevel = Math.min(1, soundLevel + 0.45);
+        if (monster.visible && !escaped && !gameOver) {
+            monsterAwareness = Math.min(1, monsterAwareness + 0.25);
+            monsterTarget.set(camera.position.x, 0, camera.position.z);
+            scrapeTimer = Math.min(scrapeTimer, 1.2);
+        }
+
+        if (coresCollected >= signalCores.length) {
+            showSubtitle(
+                "All signal cores recovered. The broadcast terminal is vulnerable.",
+                5500,
+            );
+            terminalLight.color.set(0x66ff99);
+            terminalLight.intensity = 2.2;
+            if (coreCounterEl) coreCounterEl.textContent = "SIGNAL CORES: 3/3";
+        } else {
+            showSubtitle(
+                `Signal core recovered. ${signalCores.length - coresCollected} remaining.`,
+                3500,
+            );
+        }
+        updateCompetitiveHud();
+    }
 
     function animate() {
         const dt = clock.getDelta();
+        const elapsedMs = performance.now() - runStartTime;
 
-        if (!gameOver) {
+        if (!gameOver && !escaped) {
+            updateCompetitiveHud(elapsedMs);
             camera.rotation.order = "YXZ";
             camera.rotation.y = yaw;
             camera.rotation.x = pitch;
@@ -1442,14 +2302,38 @@ function init() {
                         playNarrator("narrator_mic_found", 1.0);
                         // Monster activates after this discovery
                         setTimeout(() => {
+                            if (escaped || gameOver) return;
                             monster.visible = true;
                             startMonsterBreath();
                         }, 8000);
                         // Voice cloning sequence starts ~8s after mic found
                         setTimeout(() => {
+                            if (escaped || gameOver) return;
                             startVoiceCloningSequence();
                         }, 8000);
                     }, 800);
+                }
+            }
+
+            let promptShown = false;
+
+            // ============ SIGNAL CORE COLLECTION ============
+            if (micFound) {
+                for (const core of signalCores) {
+                    if (core.collected) continue;
+
+                    const dxc = camera.position.x - core.group.position.x;
+                    const dzc = camera.position.z - core.group.position.z;
+                    const coreDistSq = dxc * dxc + dzc * dzc;
+
+                    if (coreDistSq < 4) {
+                        promptShown = true;
+                        showInteractionPrompt("SIGNAL CORE DETECTED", "ready");
+                    }
+
+                    if (coreDistSq < 1.35) {
+                        collectSignalCore(core);
+                    }
                 }
             }
 
@@ -1457,13 +2341,45 @@ function init() {
             if (!escaped && monster.visible) {
                 const dxt = camera.position.x - 11;
                 const dzt = camera.position.z - 11;
-                if (dxt * dxt + dzt * dzt < 4) {
-                    escaped = true;
-                    triggerVictory();
+                const terminalDistSq = dxt * dxt + dzt * dzt;
+
+                if (terminalDistSq < 6.25) {
+                    promptShown = true;
+
+                    if (coresCollected >= signalCores.length) {
+                        showInteractionPrompt(
+                            "BROADCAST TERMINAL READY",
+                            "ready",
+                        );
+                        if (terminalDistSq < 4 && !escaped && !gameOver) {
+                            triggerVictory();
+                        }
+                    } else {
+                        showInteractionPrompt(
+                            `TERMINAL LOCKED — ${signalCores.length - coresCollected} SIGNAL CORES REMAIN`,
+                            "locked",
+                        );
+
+                        terminalLockedCooldown -= dt;
+                        if (terminalLockedCooldown <= 0 && terminalDistSq < 4) {
+                            terminalLockedCooldown = 4;
+                            showSubtitle(
+                                "The terminal is locked. Recover the signal cores first.",
+                                3000,
+                            );
+                        }
+                    }
                 }
+
                 // Pulse the terminal light to draw eye
                 terminalLight.intensity =
-                    1.2 + Math.sin(performance.now() * 0.005) * 0.5;
+                    coresCollected >= signalCores.length
+                        ? 1.8 + Math.sin(performance.now() * 0.006) * 0.7
+                        : 1.2 + Math.sin(performance.now() * 0.005) * 0.5;
+            }
+
+            if (!promptShown) {
+                hideInteractionPrompt();
             }
 
             // ============ AMBIENT WHISPERS ============
@@ -1592,6 +2508,59 @@ function init() {
                 if (distToPlayer < 1.5) {
                     triggerGameOver();
                 }
+
+                // ============ MONSTER ANIMATION ============
+                const mt = performance.now() * 0.001;
+                const hunt = monsterAwareness > 0.3;
+                const limbSwing = hunt ? 0.75 : 0.2;
+                leftArm.rotation.x =
+                    Math.sin(mt * (hunt ? 3.0 : 1.5)) * limbSwing;
+                rightArm.rotation.x =
+                    Math.sin(mt * (hunt ? 3.0 : 1.5) + Math.PI) * limbSwing;
+                leftArm.rotation.z = 0.15 + Math.sin(mt * 0.8) * 0.08;
+                rightArm.rotation.z = -0.15 - Math.sin(mt * 0.8) * 0.08;
+                monsterHead.rotation.y =
+                    Math.sin(mt * (hunt ? 1.5 : 0.6)) * 0.35;
+                monsterBody.position.y =
+                    1.0 + Math.sin(mt * (hunt ? 2.4 : 1.1)) * 0.04;
+
+                // Monster footsteps
+                monsterStepAccum +=
+                    dt *
+                    (tdist > 0.1 ? (monsterAwareness > 0.3 ? 1.4 : 0.6) : 0);
+                if (monsterStepAccum > 1.1) {
+                    monsterStepAccum = 0;
+                    if (distToPlayer < 14) {
+                        playOneShot(
+                            "monster_step",
+                            Math.min(
+                                0.55,
+                                0.1 + (1 - distToPlayer / 14) * 0.45,
+                            ),
+                            0.85 + Math.random() * 0.3,
+                        );
+                    }
+                }
+
+                // Camera shake when monster is very close
+                if (distToPlayer < 3.5) {
+                    const shake = (1 - distToPlayer / 3.5) * 0.016;
+                    camera.position.x += (Math.random() - 0.5) * shake;
+                    camera.position.z += (Math.random() - 0.5) * shake;
+                }
+
+                // Red danger vignette
+                if (dangerVignetteEl) {
+                    dangerVignetteEl.classList.remove("warn", "danger");
+
+                    if (distToPlayer < 3) {
+                        dangerVignetteEl.classList.add("danger");
+                    } else if (distToPlayer < 7) {
+                        dangerVignetteEl.classList.add("warn");
+                    }
+                }
+            } else if (dangerVignetteEl) {
+                dangerVignetteEl.classList.remove("warn", "danger");
             }
 
             // ============ FLICKER LIGHTS ============
@@ -1603,6 +2572,103 @@ function init() {
             brokenLight.intensity =
                 0.3 + Math.random() * 0.5 * (Math.random() < 0.1 ? 1 : 0);
             flashlight.intensity = 3.8 + Math.random() * 0.5;
+
+            // ============ ANIMATED STATIC TV ============
+            tvStaticTimer += dt;
+            if (tvStaticTimer > 0.05) {
+                tvStaticTimer = 0;
+                const tvImg = propTvCtx.createImageData(256, 192);
+                for (let i = 0; i < tvImg.data.length; i += 4) {
+                    const v = Math.random() * 255;
+                    tvImg.data[i] = v;
+                    tvImg.data[i + 1] = v;
+                    tvImg.data[i + 2] = v;
+                    tvImg.data[i + 3] = 255;
+                }
+                propTvCtx.putImageData(tvImg, 0, 0);
+
+                if (Math.random() < 0.08) {
+                    const yLine = Math.floor(Math.random() * 192);
+                    propTvCtx.fillStyle = "rgba(255,255,255,0.65)";
+                    propTvCtx.fillRect(0, yLine, 256, 2 + Math.random() * 7);
+                }
+
+                if (Math.random() < 0.01) {
+                    propTvCtx.fillStyle = "rgba(0,0,0,0.85)";
+                    propTvCtx.fillRect(
+                        80 + Math.random() * 96,
+                        30,
+                        30 + Math.random() * 30,
+                        130,
+                    );
+                }
+
+                propTvTexture.needsUpdate = true;
+
+                // Earlier small TV also flickers with its own lower-res static
+                const smallTvImg = tvCtx.createImageData(128, 96);
+                for (let i = 0; i < smallTvImg.data.length; i += 4) {
+                    const v = Math.random() * 255;
+                    smallTvImg.data[i] = v;
+                    smallTvImg.data[i + 1] = v;
+                    smallTvImg.data[i + 2] = v;
+                    smallTvImg.data[i + 3] = 255;
+                }
+                tvCtx.putImageData(smallTvImg, 0, 0);
+
+                if (Math.random() < 0.06) {
+                    const yLine = Math.floor(Math.random() * 96);
+                    tvCtx.fillStyle = "rgba(255,255,255,0.55)";
+                    tvCtx.fillRect(0, yLine, 128, 1 + Math.random() * 4);
+                }
+
+                tvTex.needsUpdate = true;
+            }
+            propTvLight.intensity = 0.35 + Math.random() * 0.55;
+            tvGlow.intensity = 0.2 + Math.random() * 0.45;
+
+            // ============ CEILING LIGHT FIXTURES ============
+            for (const cl of detailedCeilingLights) {
+                const bulbMat = cl.bulb.material as THREE.MeshBasicMaterial;
+                if (cl.broken) {
+                    if (Math.random() < 0.005) {
+                        cl.light.intensity = 0.6;
+                        bulbMat.color.set(0xfff5d0);
+                    } else {
+                        cl.light.intensity *= 0.85;
+                        if (cl.light.intensity < 0.05) {
+                            bulbMat.color.set(0x000000);
+                        }
+                    }
+                } else {
+                    cl.light.intensity = 0.68 + Math.random() * 0.22;
+                    bulbMat.color.set(0xfff5d0);
+                }
+            }
+
+            // ============ SURVEILLANCE LEDS ============
+            const ledTime = performance.now() * 0.001;
+            for (let i = 0; i < surveillanceLeds.length; i++) {
+                const blink =
+                    Math.sin(ledTime * (1.8 + i * 0.3)) > 0.7 ? 1 : 0.18;
+                const ledMat = surveillanceLeds[i]
+                    .material as THREE.MeshBasicMaterial;
+                ledMat.color.setRGB(blink, 0, 0);
+            }
+
+            // ============ SIGNAL CORE VISUALS ============
+            const coreTime = performance.now() * 0.001;
+            for (let i = 0; i < signalCores.length; i++) {
+                const core = signalCores[i];
+                if (core.collected) continue;
+
+                core.group.position.y =
+                    core.baseY + Math.sin(coreTime * 2.2 + i * 1.3) * 0.06;
+                core.orb.rotation.x += dt * 1.8;
+                core.orb.rotation.y += dt * 2.4;
+                core.orb.scale.setScalar(1 + Math.sin(coreTime * 4 + i) * 0.08);
+                core.light.intensity = 1.1 + Math.sin(coreTime * 3 + i) * 0.45;
+            }
 
             // ============ DUST ============
             const positions = particleGeo.attributes.position
