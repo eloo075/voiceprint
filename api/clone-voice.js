@@ -32,8 +32,8 @@ export default async function handler(req, res) {
                 `Content-Disposition: form-data; name="name"\r\n\r\n` +
                 `voiceprint_player_${Date.now()}\r\n` +
                 `--${boundary}\r\n` +
-                `Content-Disposition: form-data; name="files"; filename="sample.webm"\r\n` +
-                `Content-Type: audio/webm\r\n\r\n`,
+                `Content-Disposition: form-data; name="files"; filename="sample.wav"\r\n` +
+                `Content-Type: audio/wav\r\n\r\n`,
             "utf-8",
         );
         const tail = Buffer.from(`\r\n--${boundary}--\r\n`, "utf-8");
