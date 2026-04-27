@@ -248,6 +248,48 @@ export function playBufferAsMonsterWhisper(
     src.start(0);
 }
 
+// Synthetic electric spark/buzz for broken light pops
+export function playElectricZap(volume: number = 0.18): void {
+    const ac = getCtx();
+    const duration = 0.18;
+    const now = ac.currentTime;
+
+    const osc = ac.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(90 + Math.random() * 80, now);
+    osc.frequency.exponentialRampToValueAtTime(
+        900 + Math.random() * 700,
+        now + 0.04,
+    );
+    osc.frequency.exponentialRampToValueAtTime(
+        70 + Math.random() * 90,
+        now + duration,
+    );
+
+    const buzz = ac.createOscillator();
+    buzz.type = "square";
+    buzz.frequency.setValueAtTime(45 + Math.random() * 30, now);
+
+    const filter = ac.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 1300 + Math.random() * 900;
+    filter.Q.value = 6;
+
+    const gain = ac.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    osc.connect(filter);
+    buzz.connect(filter);
+    filter.connect(gain).connect(ac.destination);
+
+    osc.start(now);
+    buzz.start(now);
+    osc.stop(now + duration);
+    buzz.stop(now + duration);
+}
+
 export function setHeartbeatRate(bpm: number): void {
     // 0 = stop, 60 = calm, 140 = panic
     if (bpm <= 0) {

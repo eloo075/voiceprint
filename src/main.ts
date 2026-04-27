@@ -15,6 +15,7 @@ import {
     updateMonsterBreath,
     setHeartbeatRate,
     playBufferAsMonsterWhisper,
+    playElectricZap,
 } from "./audio";
 import {
     recordVoiceSample,
@@ -2144,15 +2145,20 @@ function init() {
         const recPrompt = document.getElementById("recording-prompt");
         const recLine = document.getElementById("rec-line");
         const recTimer = document.getElementById("rec-timer");
+        const recSub = document.getElementById("rec-sub");
 
         const lineToRead =
             "I am alone in this place. The lights flicker. The walls remember. I should not have come here, but I am here now, and I am listening. I will speak so that someone, somewhere, may hear me.";
 
         if (recLine) recLine.textContent = lineToRead;
+        if (recSub) {
+            recSub.textContent =
+                "Speak clearly in your normal voice. Stay close to the mic until the timer ends.";
+        }
         if (recPrompt) recPrompt.classList.add("visible");
 
         // Countdown timer
-        let secondsLeft = 15;
+        let secondsLeft = 20;
         const tick = () => {
             if (recTimer) recTimer.textContent = String(secondsLeft);
             secondsLeft--;
@@ -2161,8 +2167,8 @@ function init() {
         const timerInterval = window.setInterval(tick, 1000);
 
         try {
-            // Step 3: Record 15 seconds
-            const audioBlob = await recordVoiceSample(15000);
+            // Step 3: Record 20 seconds for a clearer voice clone
+            const audioBlob = await recordVoiceSample(20000);
             clearInterval(timerInterval);
             if (recPrompt) recPrompt.classList.remove("visible");
 
@@ -2225,11 +2231,25 @@ function init() {
     document.addEventListener("keydown", (e) => {
         if (e.code === "KeyB") {
             brightMode = !brightMode;
-            ambient.intensity = brightMode ? 1.5 : 0.12;
+
+            // B mode is now "clear cinematic visibility" for recording:
+            // still dark and scary, but with less fog/grain and a stronger flashlight.
+            ambient.intensity = brightMode ? 1.5 : 0.45;
             scene.fog = brightMode
                 ? new THREE.FogExp2(0x000000, 0.025)
-                : new THREE.FogExp2(0x000000, 0.18);
-            console.log(brightMode ? "☀️ Bright mode" : "🌑 Dark mode");
+                : new THREE.FogExp2(0x000000, 0.075);
+
+            renderer.toneMappingExposure = brightMode ? 1.0 : 1.22;
+            cinematicPass.uniforms.uChromatic.value = brightMode
+                ? 0.0035
+                : 0.0012;
+            cinematicPass.uniforms.uGrain.value = brightMode ? 0.08 : 0.035;
+            cinematicPass.uniforms.uContrast.value = brightMode ? 1.15 : 1.08;
+            cinematicPass.uniforms.uSaturation.value = brightMode ? 0.85 : 0.95;
+
+            console.log(
+                brightMode ? "☀️ Bright mode" : "🎥 Clear cinematic dark mode",
+            );
         }
     });
 
@@ -2736,7 +2756,9 @@ function init() {
                 (Math.random() < 0.02 ? -0.4 : 0);
             brokenLight.intensity =
                 0.3 + Math.random() * 0.5 * (Math.random() < 0.1 ? 1 : 0);
-            flashlight.intensity = 3.8 + Math.random() * 0.5;
+            flashlight.intensity = brightMode
+                ? 3.8 + Math.random() * 0.5
+                : 5.2 + Math.random() * 0.35;
 
             // ============ ANIMATED STATIC TV ============
             tvStaticTimer += dt;
@@ -2756,6 +2778,25 @@ function init() {
                     const yLine = Math.floor(Math.random() * 192);
                     propTvCtx.fillStyle = "rgba(255,255,255,0.65)";
                     propTvCtx.fillRect(0, yLine, 256, 2 + Math.random() * 7);
+                }
+
+                if (Math.random() < 0.12) {
+                    propTvCtx.save();
+                    propTvCtx.translate(
+                        Math.random() * 12 - 6,
+                        Math.random() * 8 - 4,
+                    );
+                    propTvCtx.fillStyle =
+                        Math.random() < 0.5 ? "#ff2020" : "#ffffff";
+                    propTvCtx.font = "bold 30px 'Courier New', monospace";
+                    propTvCtx.textAlign = "center";
+                    propTvCtx.shadowColor = "#ff0000";
+                    propTvCtx.shadowBlur = 12;
+                    propTvCtx.fillText("ELEVENHACKS", 128, 104);
+                    propTvCtx.globalAlpha = 0.35;
+                    propTvCtx.fillStyle = "#ff0000";
+                    propTvCtx.fillRect(20 + Math.random() * 40, 112, 190, 3);
+                    propTvCtx.restore();
                 }
 
                 if (Math.random() < 0.01) {
@@ -2787,6 +2828,22 @@ function init() {
                     tvCtx.fillRect(0, yLine, 128, 1 + Math.random() * 4);
                 }
 
+                if (Math.random() < 0.1) {
+                    tvCtx.save();
+                    tvCtx.translate(
+                        Math.random() * 6 - 3,
+                        Math.random() * 4 - 2,
+                    );
+                    tvCtx.fillStyle =
+                        Math.random() < 0.5 ? "#ff3030" : "#ffffff";
+                    tvCtx.font = "bold 14px 'Courier New', monospace";
+                    tvCtx.textAlign = "center";
+                    tvCtx.shadowColor = "#ff0000";
+                    tvCtx.shadowBlur = 6;
+                    tvCtx.fillText("ELEVENHACKS", 64, 54);
+                    tvCtx.restore();
+                }
+
                 tvTex.needsUpdate = true;
             }
             propTvLight.intensity = 0.35 + Math.random() * 0.55;
@@ -2799,6 +2856,7 @@ function init() {
                     if (Math.random() < 0.005) {
                         cl.light.intensity = 0.6;
                         bulbMat.color.set(0xfff5d0);
+                        playElectricZap(0.08 + Math.random() * 0.08);
                     } else {
                         cl.light.intensity *= 0.85;
                         if (cl.light.intensity < 0.05) {
@@ -2861,9 +2919,10 @@ function init() {
         );
 
         // Extra cinematic vignette tied to monster proximity.
-        const baseVignette = 1.2;
+        // In B mode, keep the picture clearer for recording.
+        const baseVignette = brightMode ? 1.2 : 0.75;
         const proximityBoost = monster.visible
-            ? Math.max(0, (5 - distToPlayer) / 5) * 0.6
+            ? Math.max(0, (5 - distToPlayer) / 5) * (brightMode ? 0.6 : 0.35)
             : 0;
         cinematicPass.uniforms.uVignette.value = baseVignette + proximityBoost;
 
