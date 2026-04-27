@@ -33,9 +33,16 @@ function init() {
     );
     camera.position.set(0, 1.7, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        powerPreference: "high-performance",
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const quality = new URLSearchParams(window.location.search).get("quality");
+    const pixelRatioCap =
+        quality === "ultra" ? 3 : quality === "high" ? 2.5 : 2;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -537,8 +544,8 @@ function init() {
         1.5,
     );
     flashlight.castShadow = true;
-    flashlight.shadow.mapSize.width = 1024;
-    flashlight.shadow.mapSize.height = 1024;
+    flashlight.shadow.mapSize.width = 2048;
+    flashlight.shadow.mapSize.height = 2048;
     camera.add(flashlight);
     camera.add(flashlight.target);
     flashlight.target.position.set(0, 0, -1);
@@ -2694,6 +2701,9 @@ function init() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(
+            Math.min(window.devicePixelRatio, pixelRatioCap),
+        );
     });
 
     animate();
