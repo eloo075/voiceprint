@@ -1,4 +1,8 @@
 import * as THREE from "three";
+import { EffectComposer } from "three-stdlib";
+import { RenderPass } from "three-stdlib";
+import { UnrealBloomPass } from "three-stdlib";
+import { ShaderPass } from "three-stdlib";
 import "./style.css";
 import {
     loadAllSounds,
@@ -36,18 +40,119 @@ function init() {
     const renderer = new THREE.WebGLRenderer({
         antialias: true,
         powerPreference: "high-performance",
+        stencil: false,
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     const quality = new URLSearchParams(window.location.search).get("quality");
     const pixelRatioCap =
         quality === "ultra" ? 3 : quality === "high" ? 2.5 : 2;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.VSMShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.0;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     document.body.appendChild(renderer.domElement);
+
+    // ============ POST-PROCESSING PIPELINE ============
+    const composer = new EffectComposer(renderer);
+    composer.setSize(window.innerWidth, window.innerHeight);
+    composer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    // Bloom — makes lights glow cinematically
+    const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.7,
+        0.6,
+        0.25,
+    );
+    composer.addPass(bloomPass);
+
+    // Color grading + film effects shader
+    const cinematicShader = {
+        uniforms: {
+            tDiffuse: { value: null },
+            uTime: { value: 0 },
+            uVignette: { value: 1.2 },
+            uChromatic: { value: 0.0035 },
+            uGrain: { value: 0.08 },
+            uContrast: { value: 1.15 },
+            uSaturation: { value: 0.85 },
+            uTint: { value: new THREE.Vector3(1.0, 0.96, 0.92) },
+            uBloodSplat: { value: 0.0 },
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform sampler2D tDiffuse;
+            uniform float uTime;
+            uniform float uVignette;
+            uniform float uChromatic;
+            uniform float uGrain;
+            uniform float uContrast;
+            uniform float uSaturation;
+            uniform vec3 uTint;
+            uniform float uBloodSplat;
+            varying vec2 vUv;
+
+            float random(vec2 st) {
+                return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+            }
+
+            void main() {
+                vec2 uv = vUv;
+                vec2 center = vec2(0.5);
+                vec2 fromCenter = uv - center;
+
+                // Chromatic aberration — split color channels toward the edges.
+                vec3 col;
+                col.r = texture2D(tDiffuse, uv + fromCenter * uChromatic).r;
+                col.g = texture2D(tDiffuse, uv).g;
+                col.b = texture2D(tDiffuse, uv - fromCenter * uChromatic).b;
+
+                // Warm cinematic color grade.
+                col *= uTint;
+
+                // Contrast.
+                col = (col - 0.5) * uContrast + 0.5;
+
+                // Saturation.
+                float gray = dot(col, vec3(0.299, 0.587, 0.114));
+                col = mix(vec3(gray), col, uSaturation);
+
+                // Film grain.
+                float grain = random(uv * (uTime * 0.001 + 17.0)) - 0.5;
+                col += grain * uGrain;
+
+                // Vignette.
+                float dist = length(fromCenter);
+                float vig = 1.0 - dist * uVignette;
+                vig = clamp(vig, 0.0, 1.0);
+                col *= vig;
+
+                // Blood splatter / red edge pressure when monster is close.
+                if (uBloodSplat > 0.0) {
+                    float n = random(uv * 42.0);
+                    float splat = smoothstep(1.0 - uBloodSplat * 0.4, 1.0, n);
+                    col = mix(col, vec3(0.5, 0.0, 0.0), splat * uBloodSplat);
+                    col.r += dist * uBloodSplat * 0.6;
+                }
+
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `,
+    };
+
+    const cinematicPass = new ShaderPass(cinematicShader);
+    composer.addPass(cinematicPass);
 
     // ============ TEXTURE GENERATORS ============
     function makeNoiseTexture(
@@ -546,9 +651,60 @@ function init() {
     flashlight.castShadow = true;
     flashlight.shadow.mapSize.width = 2048;
     flashlight.shadow.mapSize.height = 2048;
+    flashlight.shadow.bias = -0.0005;
+    flashlight.shadow.normalBias = 0.02;
+    flashlight.shadow.radius = 4;
     camera.add(flashlight);
     camera.add(flashlight.target);
     flashlight.target.position.set(0, 0, -1);
+
+    // ============ VOLUMETRIC FLASHLIGHT BEAM ============
+    // A semi-transparent cone that simulates light cutting through dust.
+    const beamGeometry = new THREE.ConeGeometry(2.5, 14, 32, 1, true);
+    beamGeometry.translate(0, -7, 0);
+    beamGeometry.rotateX(-Math.PI / 2);
+
+    const beamMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            uOpacity: { value: 0.16 },
+            uColor: { value: new THREE.Color(0xfff0d0) },
+        },
+        vertexShader: `
+            varying vec3 vPosition;
+            varying vec3 vNormal;
+
+            void main() {
+                vPosition = position;
+                vNormal = normalize(normalMatrix * normal);
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform float uOpacity;
+            uniform vec3 uColor;
+            varying vec3 vPosition;
+            varying vec3 vNormal;
+
+            void main() {
+                float radialDist = length(vPosition.xy);
+                float radialFade = 1.0 - smoothstep(0.0, 2.5, radialDist);
+                float forwardFade = smoothstep(0.0, 2.0, -vPosition.z);
+                float edgeSoftness = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.0);
+                float alpha = uOpacity * radialFade * forwardFade * (1.0 - edgeSoftness * 0.5);
+
+                gl_FragColor = vec4(uColor, alpha);
+            }
+        `,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+    });
+
+    const flashlightBeam = new THREE.Mesh(beamGeometry, beamMaterial);
+    flashlightBeam.position.set(0, 0, 0);
+    camera.add(flashlightBeam);
+
     scene.add(camera);
 
     const emergency = new THREE.PointLight(0xff2030, 0.6, 10);
@@ -2246,7 +2402,9 @@ function init() {
 
     function animate() {
         const dt = clock.getDelta();
+        const time = performance.now() * 0.001;
         const elapsedMs = performance.now() - runStartTime;
+        let distToPlayer = 999;
 
         if (!gameOver && !escaped) {
             updateCompetitiveHud(elapsedMs);
@@ -2419,7 +2577,7 @@ function init() {
             if (monster.visible) {
                 const dxm = camera.position.x - monster.position.x;
                 const dzm = camera.position.z - monster.position.z;
-                const distToPlayer = Math.sqrt(dxm * dxm + dzm * dzm);
+                distToPlayer = Math.sqrt(dxm * dxm + dzm * dzm);
 
                 // Awareness rises when player is loud, decays otherwise
                 if (soundLevel > 0.2) {
@@ -2693,17 +2851,39 @@ function init() {
             particleGeo.attributes.position.needsUpdate = true;
         }
 
-        renderer.render(scene, camera);
+        // Update post-processing uniforms.
+        cinematicPass.uniforms.uTime.value = time * 1000;
+
+        // Blood pressure / splatter intensifies when the monster is very close.
+        cinematicPass.uniforms.uBloodSplat.value = Math.max(
+            0,
+            Math.min(0.9, (4 - distToPlayer) / 4),
+        );
+
+        // Extra cinematic vignette tied to monster proximity.
+        const baseVignette = 1.2;
+        const proximityBoost = monster.visible
+            ? Math.max(0, (5 - distToPlayer) / 5) * 0.6
+            : 0;
+        cinematicPass.uniforms.uVignette.value = baseVignette + proximityBoost;
+
+        // Render through post-processing composer.
+        composer.render();
         requestAnimationFrame(animate);
     }
 
     window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
+
+        const pixelRatio = Math.min(window.devicePixelRatio, pixelRatioCap);
+
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(
-            Math.min(window.devicePixelRatio, pixelRatioCap),
-        );
+        renderer.setPixelRatio(pixelRatio);
+
+        composer.setSize(window.innerWidth, window.innerHeight);
+        composer.setPixelRatio(pixelRatio);
+        bloomPass.setSize(window.innerWidth, window.innerHeight);
     });
 
     animate();

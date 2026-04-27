@@ -209,27 +209,41 @@ export function playBufferAsMonsterWhisper(
     const ac = getCtx();
     const src = ac.createBufferSource();
     src.buffer = buf;
-    // Slightly slow it down for unsettling effect
-    src.playbackRate.value = 0.92;
+
+    // Keep playback natural so the cloned voice stays recognizable.
+    src.playbackRate.value = 1.0;
+
     const g = ac.createGain();
-    // Louder than before — and a floor of 0.55 so it's always audible
-    g.gain.value = Math.max(0.55, Math.min(1.1, (1 - distance * 0.4) * 1.0));
+    // Stable, clear volume: audible at range, but avoids harsh clipping up close.
+    g.gain.value = Math.max(0.65, Math.min(0.95, 0.9 - distance * 0.2));
+
     const p = ac.createStereoPanner();
     p.pan.value = Math.max(-1, Math.min(1, pan));
-    // Less aggressive low-pass so the voice is more recognizable
-    const filter = ac.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 3500;
-    // Slight reverb-ish wet sound using a delay tap
-    const delay = ac.createDelay(0.15);
-    delay.delayTime.value = 0.08;
+
+    // High-pass removes rumble while preserving speech clarity.
+    const highpass = ac.createBiquadFilter();
+    highpass.type = "highpass";
+    highpass.frequency.value = 110;
+
+    // Wider low-pass keeps consonants/detail so the voice is understandable.
+    const lowpass = ac.createBiquadFilter();
+    lowpass.type = "lowpass";
+    lowpass.frequency.value = 7200;
+
+    // Subtle delay only — atmospheric without muddying the words.
+    const delay = ac.createDelay(0.12);
+    delay.delayTime.value = 0.055;
     const wetGain = ac.createGain();
-    wetGain.gain.value = 0.35;
-    src.connect(filter);
-    filter.connect(g);
-    filter.connect(delay);
+    wetGain.gain.value = 0.12;
+
+    src.connect(highpass);
+    highpass.connect(lowpass);
+
+    lowpass.connect(g);
+    lowpass.connect(delay);
     delay.connect(wetGain);
     wetGain.connect(g);
+
     g.connect(p).connect(ac.destination);
     src.start(0);
 }

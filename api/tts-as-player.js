@@ -34,9 +34,9 @@ export default async function handler(req, res) {
                     text,
                     model_id: "eleven_multilingual_v2",
                     voice_settings: {
-                        stability: 0.3,
-                        similarity_boost: 0.85,
-                        style: 0.7,
+                        stability: 0.5,
+                        similarity_boost: 0.9,
+                        style: 0.25,
                         use_speaker_boost: true,
                     },
                 }),

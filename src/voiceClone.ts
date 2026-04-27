@@ -136,7 +136,9 @@ export async function recordVoiceSample(durationMs: number): Promise<Blob> {
     const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
             echoCancellation: true,
-            noiseSuppression: true,
+            // Disable browser noise suppression because it can create watery artifacts
+            // that hurt ElevenLabs voice cloning quality.
+            noiseSuppression: false,
             autoGainControl: true,
             channelCount: 1,
             sampleRate: 44100,
@@ -151,7 +153,8 @@ export async function recordVoiceSample(durationMs: number): Promise<Blob> {
 
     const source = ctx.createMediaStreamSource(stream);
     const gain = ctx.createGain();
-    gain.gain.value = 1.4;
+    // Keep gain conservative to avoid clipping/distortion in the cloned sample.
+    gain.gain.value = 1.05;
 
     const processor = ctx.createScriptProcessor(4096, 1, 1);
     const chunks: Float32Array[] = [];
