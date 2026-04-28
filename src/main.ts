@@ -15,7 +15,6 @@ import {
     updateMonsterBreath,
     setHeartbeatRate,
     playBufferAsMonsterWhisper,
-    playElectricZap,
 } from "./audio";
 import {
     recordVoiceSample,
@@ -28,7 +27,7 @@ function init() {
     // ============ SCENE SETUP ============
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
-    scene.fog = new THREE.FogExp2(0x000000, 0.025);
+    scene.fog = new THREE.FogExp2(0x000000, 0.016);
 
     const camera = new THREE.PerspectiveCamera(
         75,
@@ -77,11 +76,11 @@ function init() {
         uniforms: {
             tDiffuse: { value: null },
             uTime: { value: 0 },
-            uVignette: { value: 1.2 },
-            uChromatic: { value: 0.0035 },
-            uGrain: { value: 0.08 },
-            uContrast: { value: 1.15 },
-            uSaturation: { value: 0.85 },
+            uVignette: { value: 0.85 },
+            uChromatic: { value: 0.002 },
+            uGrain: { value: 0.045 },
+            uContrast: { value: 1.08 },
+            uSaturation: { value: 0.95 },
             uTint: { value: new THREE.Vector3(1.0, 0.96, 0.92) },
             uBloodSplat: { value: 0.0 },
         },
@@ -638,13 +637,13 @@ function init() {
     ceilingTex.repeat.set(4, 4);
 
     // ============ LIGHTING ============
-    const ambient = new THREE.AmbientLight(0x6a6a8a, 1.5);
+    const ambient = new THREE.AmbientLight(0x76708f, 2.15);
     scene.add(ambient);
 
     const flashlight = new THREE.SpotLight(
         0xfff0d0,
-        4,
-        18,
+        6.2,
+        24,
         Math.PI / 6.5,
         0.5,
         1.5,
@@ -667,7 +666,7 @@ function init() {
 
     const beamMaterial = new THREE.ShaderMaterial({
         uniforms: {
-            uOpacity: { value: 0.16 },
+            uOpacity: { value: 0.24 },
             uColor: { value: new THREE.Color(0xfff0d0) },
         },
         vertexShader: `
@@ -717,7 +716,7 @@ function init() {
     scene.add(brokenLight);
 
     // Warm amber desk lamp glow at the mixing desk
-    const deskLamp = new THREE.PointLight(0xff8820, 1.2, 5);
+    const deskLamp = new THREE.PointLight(0xffaa55, 2.4, 7);
     deskLamp.position.set(-10, 1.8, -10);
     scene.add(deskLamp);
 
@@ -1125,6 +1124,47 @@ function init() {
     micHead.position.set(-10.1, 1.6, -10);
     scene.add(micHead);
 
+    // Bright visible lamp above the mic desk so the objective is readable in recordings
+    const micLampShade = new THREE.Mesh(
+        new THREE.ConeGeometry(0.32, 0.28, 24, 1, true),
+        new THREE.MeshStandardMaterial({
+            color: 0x2a2118,
+            roughness: 0.45,
+            metalness: 0.25,
+            side: THREE.DoubleSide,
+        }),
+    );
+    micLampShade.position.set(-10, 2.45, -10);
+    micLampShade.rotation.x = Math.PI;
+    scene.add(micLampShade);
+
+    const micLampBulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xffe0a0 }),
+    );
+    micLampBulb.position.set(-10, 2.28, -10);
+    scene.add(micLampBulb);
+
+    const micDeskSpot = new THREE.SpotLight(
+        0xffc078,
+        5.0,
+        7,
+        Math.PI / 4.2,
+        0.65,
+        1.4,
+    );
+    micDeskSpot.position.set(-10, 2.55, -10);
+    micDeskSpot.target.position.set(-10, 0.9, -10);
+    micDeskSpot.castShadow = true;
+    micDeskSpot.shadow.mapSize.width = 1024;
+    micDeskSpot.shadow.mapSize.height = 1024;
+    scene.add(micDeskSpot);
+    scene.add(micDeskSpot.target);
+
+    const micDeskGlow = new THREE.PointLight(0xffaa55, 1.9, 5.5);
+    micDeskGlow.position.set(-10, 1.55, -10);
+    scene.add(micDeskGlow);
+
     const mixingBoard = new THREE.Mesh(
         new THREE.BoxGeometry(1.4, 0.1, 0.5),
         new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5 }),
@@ -1194,6 +1234,72 @@ function init() {
     terminalGroup.add(labelMesh);
 
     scene.add(terminalGroup);
+
+    // ============ HAUNTED DOORS ============
+    type HauntedDoor = {
+        group: THREE.Group;
+        slab: THREE.Mesh;
+        creaked: boolean;
+        openAmount: number;
+        baseRotation: number;
+    };
+    const hauntedDoors: HauntedDoor[] = [];
+
+    function addHauntedDoor(x: number, z: number, ry: number) {
+        const group = new THREE.Group();
+        group.position.set(x, 0, z);
+        group.rotation.y = ry;
+
+        const frame = new THREE.Mesh(
+            new THREE.BoxGeometry(1.15, 2.15, 0.12),
+            new THREE.MeshStandardMaterial({
+                color: 0x120c08,
+                roughness: 0.75,
+            }),
+        );
+        frame.position.y = 1.08;
+        group.add(frame);
+
+        const slab = new THREE.Mesh(
+            new THREE.BoxGeometry(0.9, 1.9, 0.08),
+            new THREE.MeshStandardMaterial({
+                color: 0x2b1a10,
+                roughness: 0.82,
+            }),
+        );
+        slab.position.set(0.06, 1.0, 0.08);
+        slab.castShadow = true;
+        slab.receiveShadow = true;
+        group.add(slab);
+
+        const knob = new THREE.Mesh(
+            new THREE.SphereGeometry(0.045, 12, 12),
+            new THREE.MeshStandardMaterial({
+                color: 0xa87932,
+                metalness: 0.7,
+                roughness: 0.25,
+            }),
+        );
+        knob.position.set(0.32, 1.0, 0.15);
+        group.add(knob);
+
+        const crackLight = new THREE.PointLight(0xff2020, 0.0, 2.5);
+        crackLight.position.set(0, 1.15, 0.18);
+        group.add(crackLight);
+
+        scene.add(group);
+        hauntedDoors.push({
+            group,
+            slab,
+            creaked: false,
+            openAmount: 0,
+            baseRotation: ry,
+        });
+    }
+
+    addHauntedDoor(-4, -5.18, 0);
+    addHauntedDoor(5, 4.82, Math.PI);
+    addHauntedDoor(8.18, -1.5, -Math.PI / 2);
 
     // ============ CHAIRS ============
     function addChair(
@@ -2234,18 +2340,18 @@ function init() {
 
             // B mode is now "clear cinematic visibility" for recording:
             // still dark and scary, but with less fog/grain and a stronger flashlight.
-            ambient.intensity = brightMode ? 1.5 : 0.45;
+            ambient.intensity = brightMode ? 2.15 : 0.85;
             scene.fog = brightMode
-                ? new THREE.FogExp2(0x000000, 0.025)
-                : new THREE.FogExp2(0x000000, 0.075);
+                ? new THREE.FogExp2(0x000000, 0.016)
+                : new THREE.FogExp2(0x000000, 0.045);
 
             renderer.toneMappingExposure = brightMode ? 1.0 : 1.22;
             cinematicPass.uniforms.uChromatic.value = brightMode
                 ? 0.0035
                 : 0.0012;
-            cinematicPass.uniforms.uGrain.value = brightMode ? 0.08 : 0.035;
-            cinematicPass.uniforms.uContrast.value = brightMode ? 1.15 : 1.08;
-            cinematicPass.uniforms.uSaturation.value = brightMode ? 0.85 : 0.95;
+            cinematicPass.uniforms.uGrain.value = brightMode ? 0.045 : 0.02;
+            cinematicPass.uniforms.uContrast.value = brightMode ? 1.08 : 1.02;
+            cinematicPass.uniforms.uSaturation.value = brightMode ? 0.95 : 1.05;
 
             console.log(
                 brightMode ? "☀️ Bright mode" : "🎥 Clear cinematic dark mode",
@@ -2290,6 +2396,7 @@ function init() {
     let escaped = false;
     let monsterStepAccum = 0;
     let tvStaticTimer = 0;
+    let screamTimer = 35 + Math.random() * 25;
 
     // Competitive run state
     let coresCollected = 0;
@@ -2567,7 +2674,30 @@ function init() {
                 hideInteractionPrompt();
             }
 
-            // ============ AMBIENT WHISPERS ============
+            // ============ HAUNTED DOORS ============
+            for (const door of hauntedDoors) {
+                const dxd = camera.position.x - door.group.position.x;
+                const dzd = camera.position.z - door.group.position.z;
+                const doorDistSq = dxd * dxd + dzd * dzd;
+
+                if (!door.creaked && doorDistSq < 9) {
+                    door.creaked = true;
+                    door.openAmount = 1;
+                    playOneShot(
+                        "door_creak",
+                        0.55,
+                        0.85 + Math.random() * 0.25,
+                    );
+                }
+
+                if (door.openAmount > 0.01) {
+                    door.slab.rotation.y +=
+                        (0.55 - door.slab.rotation.y) * 0.03;
+                    door.openAmount *= 0.985;
+                }
+            }
+
+            // ============ AMBIENT WHISPERS + DISTANT SCREAMS ============
             whisperTimer -= dt;
             if (whisperTimer <= 0) {
                 whisperTimer = 18 + Math.random() * 22;
@@ -2576,6 +2706,16 @@ function init() {
                 } else {
                     playOneShot("static_burst", 0.15);
                 }
+            }
+
+            screamTimer -= dt;
+            if (monster.visible && screamTimer <= 0) {
+                screamTimer = 45 + Math.random() * 35;
+                playOneShot(
+                    "monster_caught_scream",
+                    0.16,
+                    0.65 + Math.random() * 0.25,
+                );
             }
 
             // ============ CAMERA HEIGHT (with crouch) ============
@@ -2757,8 +2897,8 @@ function init() {
             brokenLight.intensity =
                 0.3 + Math.random() * 0.5 * (Math.random() < 0.1 ? 1 : 0);
             flashlight.intensity = brightMode
-                ? 3.8 + Math.random() * 0.5
-                : 5.2 + Math.random() * 0.35;
+                ? 6.2 + Math.random() * 0.5
+                : 7.8 + Math.random() * 0.35;
 
             // ============ ANIMATED STATIC TV ============
             tvStaticTimer += dt;
@@ -2856,7 +2996,6 @@ function init() {
                     if (Math.random() < 0.005) {
                         cl.light.intensity = 0.6;
                         bulbMat.color.set(0xfff5d0);
-                        playElectricZap(0.08 + Math.random() * 0.08);
                     } else {
                         cl.light.intensity *= 0.85;
                         if (cl.light.intensity < 0.05) {
@@ -2920,7 +3059,7 @@ function init() {
 
         // Extra cinematic vignette tied to monster proximity.
         // In B mode, keep the picture clearer for recording.
-        const baseVignette = brightMode ? 1.2 : 0.75;
+        const baseVignette = brightMode ? 0.85 : 0.55;
         const proximityBoost = monster.visible
             ? Math.max(0, (5 - distToPlayer) / 5) * (brightMode ? 0.6 : 0.35)
             : 0;
